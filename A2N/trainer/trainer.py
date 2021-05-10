@@ -19,17 +19,25 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         self.model = model
 
     def compile(
-        self, optimizer: tf.keras.optimizers, loss: tf.keras.losses.Loss
+        self,
+        optimizer: tf.keras.optimizers,
+        loss: tf.keras.losses.Loss,
+        metric=tf.keras.metrics.Metric,
     ) -> None:
         # pylint: disable=attribute-defined-outside-init
         """compiles the model object with corresponding attributes
         Args:
             optimizer (tf.keras.optimizers): optimizer for model training
             loss (Dict[tf.keras.losses.Loss]): loss definitions for the model outputs
+            loss (Dict[tf.keras.metrics.Metric]): performance metrics for model outputs
         """
         super().compile()
         self.optimizer = optimizer
         self.loss = loss
+        assert len(self.loss) == len(
+            metric
+        ), "provide metric functions for all outputs, 'None' wherever not applicable"
+        self.loss_metrics = metric
         self.loss_keys = loss.keys()
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
@@ -74,14 +82,14 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         logs = dict(zip(self.loss_keys, losses))
         logs = {key: tf.reduce_mean(value) for key, value in logs.items()}
 
-        # # Add metrics if applicable
-        # for i, key in enumerate(self.loss_keys):
-        #     metric_func = self.loss_metrics[key]
+        # Add metrics if applicable
+        for i, key in enumerate(self.loss_keys):
+            metric_func = self.loss_metrics[key]
 
-        #     # Only evaluate the not-None metrics
-        #     if metric_func is not None:
-        #         metric_func.update_state(outputs[i], model_outputs[i])
-        #         logs[metric_func.name] = metric_func.result()
+            # Only evaluate the not-None metrics
+            if metric_func is not None:
+                metric_func.update_state(HR, model_outputs)
+                logs[metric_func.name] = metric_func.result()
 
         # House-keeping
         del tape
