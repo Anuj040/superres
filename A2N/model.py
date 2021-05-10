@@ -6,6 +6,7 @@ import tensorflow.keras.layers as KL
 import tensorflow.keras.models as KM
 
 sys.path.append("./")
+from A2N.trainer.trainer import Trainer
 from A2N.utils.generator import DataGenerator
 
 
@@ -29,7 +30,8 @@ def AAM(
         tf.Tensor: attention weights for respective branches
     """
 
-    x = KL.GlobalAveragePooling2D()(input_tensor)
+    # pylint: disable=unnecessary-lambda
+    x = KL.Lambda(lambda x: tf.reduce_mean(x, axis=(1, 2), keepdims=True))(input_tensor)
     x = KL.Dense(features // reduction, use_bias=False)(x)
     x = KL.Activation("relu")(x)
     x = KL.Dense(n_branch, use_bias=False)(x)
@@ -98,7 +100,9 @@ def AAB(shape: tuple, features: int = 40, name: str = "AAB") -> KM.Model:
     non_attention = KL.Conv2D(features, 3, padding="same", use_bias=False)(x)
 
     # linear combination of features from respective branches above
-    x = attention * ax[:, 0] + non_attention * ax[:, 1]
+    x = attention * tf.expand_dims(
+        ax[..., 0], axis=-1
+    ) + non_attention * tf.expand_dims(ax[..., 1], axis=-1)
     x = KL.LeakyReLU(alpha=0.2)(x)
 
     out = KL.Conv2D(features, kernel_size=1, use_bias=False)(x)
@@ -148,7 +152,7 @@ class SuperRes:
         Returns:
             KM.Model: super resoultion model object
         """
-        input_tensor = KL.Input(shape=shape, name="HR")
+        input_tensor = KL.Input(shape=shape, name="LR")
 
         # First Convolution
         x = KL.Conv2D(features, 3, strides=(1, 1), use_bias=True, padding="same")(
@@ -205,10 +209,32 @@ class SuperRes:
         )
 
         # HR reconstruction
-        output = output + up_LR
+        # pylint: disable=unnecessary-lambda
+        output = KL.Lambda(lambda x: tf.identity(x), name="HR")(output + up_LR)
 
         return KM.Model(inputs=input_tensor, outputs=output, name=name)
 
+    def train(self) -> None:
+        """model training method"""
+
+        # Get the generator object
+        train_generator = DataGenerator(
+            "datasets", "train", scale=self.scale, shuffle=True
+        )
+
+        # Prepare the trainer object
+        model = Trainer(model=self.model)
+
+        # Attributes for the trainer object
+        optimizer = tf.keras.optimizers.Adam()
+        loss = {"HR": tf.keras.losses.mse}
+        # Compile the trainer object
+        model.compile(optimizer=optimizer, loss=loss)
+
+        # model training
+        model.fit(train_generator(), epochs=10, workers=8, verbose=1)
+
 
 if __name__ == "__main__":
-    SuperRes()
+    superres = SuperRes()
+    superres.train()
