@@ -59,7 +59,7 @@ class DataGenerator:
         lr_w = tf.cast(0.25 * shape[1], tf.int32)
 
         # LR image
-        image_small = tf.image.resize(image, size=[lr_h, lr_w])
+        image_small = tf.image.resize(image, size=(lr_h, lr_w), method="bicubic")
 
         return image_small, image
 
