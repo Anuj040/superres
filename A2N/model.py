@@ -118,7 +118,13 @@ def pixel_attention(input_tensor: tf.Tensor, features: int = 24) -> tf.Tensor:
 
 
 class SuperRes:
+    """super-resolution model class"""
+
     def __init__(self, scale: int = 4) -> None:
+        """
+        Args:
+            scale (int, optional): upscale factor for the input image. Defaults to 4.
+        """
         self.scale = scale
         self.model = self.build(name="superres")
 
