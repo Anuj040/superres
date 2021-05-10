@@ -49,10 +49,10 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         """
         return self.model(inputs, training=False)
 
-    def train_step(self, inputs) -> dict:
+    def train_step(self, inputs: tf.Tensor) -> dict:
         """method to implement a training step
         Args:
-            data (tf.Tensor): a batch instance consisting of input-output pair
+            inputs (tf.Tensor): a batch instance consisting of input-output pair
         Returns:
             dict: dict object containing batch performance parameters
         """
@@ -68,7 +68,7 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
 
             losses = []
             # calculate losses
-            for i, key in enumerate(self.loss_keys):
+            for _, key in enumerate(self.loss_keys):
                 losses.append(self.loss[key](HR, model_outputs))
 
         # calculate and apply gradients
@@ -83,7 +83,7 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         logs = {key: tf.reduce_mean(value) for key, value in logs.items()}
 
         # Add metrics if applicable
-        for i, key in enumerate(self.loss_keys):
+        for _, key in enumerate(self.loss_keys):
             metric_func = self.loss_metrics[key]
 
             # Only evaluate the not-None metrics
@@ -94,3 +94,38 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         # House-keeping
         del tape
         return logs
+
+    @property
+    def metrics(self):
+        # list `Metric` objects here so that `reset_states()` can be
+        # called automatically at the start of each epoch
+        # or at the start of `evaluate()`.
+        # Without this property, `reset_states()` will have to called
+        # manually.
+        return [
+            metric_func
+            for key, metric_func in self.loss_metrics.items()
+            if metric_func is not None
+        ]
+
+    def test_step(self, inputs: tf.Tensor) -> dict:
+        """method to implement evaluation step
+        Args:
+            inputs(tf.Tensor): a batch instance consisting of input-output pair
+        Returns:
+            dict: dict object containing batch performance parameters on classification task only
+        """
+        # unpack the data
+        LR, HR = inputs
+
+        # get the model outputs
+        model_outputs = self.model(LR, training=False)
+
+        # Get the metric calculator
+        metric_func = self.loss_metrics["HR"]
+
+        # Calculate the performance metrics
+        metric_func.update_state(HR, model_outputs)
+
+        # return the logs dict
+        return {metric_func.name: metric_func.result()}
