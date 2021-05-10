@@ -135,7 +135,7 @@ class SuperRes:
 
     def build(
         self,
-        shape: tuple = (64, 64, 3),
+        shape: tuple = (None, None, 3),
         features: int = 40,
         up_features: int = 24,
         n_blocks: int = 16,
@@ -168,14 +168,11 @@ class SuperRes:
         x = KL.Conv2D(features, 3, strides=(1, 1), use_bias=True, padding="same")(x)
         fea = fea + x
 
-        # tensor resizer object
-        resizer = tf.compat.v1.image.resize
-
         # upscale the features
         if self.scale == 4:
             # 2X
-            fea = resizer(
-                fea, size=(int(shape[0] * 2), int(shape[1] * 2)), method="nearest"
+            fea = KL.UpSampling2D(size=(2, 2), interpolation="nearest", name="map2up")(
+                fea
             )
 
             fea = KL.Conv2D(up_features, 3, 1, use_bias=True, padding="same")(fea)
@@ -186,8 +183,8 @@ class SuperRes:
             fea = KL.LeakyReLU(alpha=0.2)(fea)
 
             # 4X
-            fea = resizer(
-                fea, size=(int(shape[0] * 4), int(shape[1] * 4)), method="nearest"
+            fea = KL.UpSampling2D(size=(2, 2), interpolation="nearest", name="map4up")(
+                fea
             )
 
             fea = KL.Conv2D(up_features, 3, 1, use_bias=True, padding="same")(fea)
@@ -202,12 +199,9 @@ class SuperRes:
         output = KL.Conv2D(shape[-1], 3, 1, use_bias=True, padding="same")(fea)
 
         # Upscale the input tensor
-        up_LR = resizer(
-            input_tensor,
-            size=(int(shape[0] * self.scale), int(shape[1] * self.scale)),
-            method="bilinear",
-            align_corners=False,
-        )
+        up_LR = KL.UpSampling2D(
+            size=(self.scale, self.scale), interpolation="bilinear", name="up_LR"
+        )(input_tensor)
 
         # HR reconstruction
         # pylint: disable=unnecessary-lambda
@@ -218,7 +212,7 @@ class SuperRes:
     def train(self) -> None:
         """model training method"""
 
-        # Get the generator object
+        # Get the generator objects
         train_generator = DataGenerator(
             "datasets", "train", scale=self.scale, shuffle=True
         )
