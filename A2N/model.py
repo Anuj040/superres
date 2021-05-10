@@ -8,6 +8,7 @@ import tensorflow.keras.models as KM
 sys.path.append("./")
 from A2N.trainer.trainer import Trainer
 from A2N.utils.generator import DataGenerator
+from A2N.utils.losses import PSNRLayer
 
 
 def AAM(
@@ -228,8 +229,10 @@ class SuperRes:
         # Attributes for the trainer object
         optimizer = tf.keras.optimizers.Adam()
         loss = {"HR": tf.keras.losses.mse}
+        metric = {"HR": PSNRLayer()}
+
         # Compile the trainer object
-        model.compile(optimizer=optimizer, loss=loss)
+        model.compile(optimizer=optimizer, loss=loss, metric=metric)
 
         # model training
         model.fit(train_generator(), epochs=10, workers=8, verbose=1)
