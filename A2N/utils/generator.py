@@ -13,6 +13,7 @@ class DataGenerator:
         path: str,
         split: str = "train",
         batch_size: int = 2,
+        scale: int = 4,
         shuffle: bool = False,
     ) -> None:
         """Method to build the dataset generator object
@@ -20,8 +21,12 @@ class DataGenerator:
         Args:
             path (str): Path to the main directory
             split (str, optional): Data split to utilize. Defaults to "train".
+            batch_size (int, optional): Batch size for the model. Defaults to 2.
+            scale (int, optional): Image upsampling ratio. Defaults to 4.
             shuffle (bool, optional): whether to shuffle the data files. Defaults to False.
         """
+        self.scale = scale
+
         # Make single image object retriever function
         builder = tfds.ImageFolder(path)
         dataset = builder.as_dataset(
@@ -52,11 +57,11 @@ class DataGenerator:
         image = 2.0 * tf.cast(element["image"], tf.float32) / 255.0 - 1.0
 
         # shape of original image
-        shape = tf.cast(tf.shape(image), tf.float32)
+        shape = tf.shape(image)
 
         # dimensions of scaled down image
-        lr_h = tf.cast(0.25 * shape[0], tf.int32)
-        lr_w = tf.cast(0.25 * shape[1], tf.int32)
+        lr_h = shape[0] // self.scale
+        lr_w = shape[1] // self.scale
 
         # LR image
         image_small = tf.image.resize(image, size=(lr_h, lr_w), method="bicubic")
