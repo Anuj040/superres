@@ -48,7 +48,7 @@ class DataGenerator:
             Tuple[tf.Tensor, tf.Tensor]: Pair of HR-LR images
         """
 
-        # Get the image array # HR image
+        # Get the image array # HR image (-1.0, 1.0)
         image = 2.0 * tf.cast(element["image"], tf.float32) / 255.0 - 1.0
 
         # shape of original image
@@ -70,6 +70,10 @@ class DataGenerator:
             tf.data.Dataset: Generator object
         """
         return self.dataset
+
+    def __len__(self) -> int:
+        """Get the total number of batches"""
+        return self.dataset.cardinality().numpy()
 
 
 if __name__ == "__main__":
