@@ -209,13 +209,23 @@ class SuperRes:
 
         return KM.Model(inputs=input_tensor, outputs=output, name=name)
 
-    def train(self) -> None:
-        """model training method"""
+    def train(self, train_batch_size: int = 2, val_batch_size: int = 2) -> None:
+        """model training method
+
+        Args:
+            train_batch_size (int, optional): batch size for training epoch. Defaults to 2.
+            val_batch_size (int, optional): batch size for validation epoch. Defaults to 2.
+        """
 
         # Get the generator objects
         train_generator = DataGenerator(
-            "datasets", "train", scale=self.scale, shuffle=True
+            "datasets",
+            "train",
+            batch_size=train_batch_size,
+            scale=self.scale,
+            shuffle=True,
         )
+        val_generator = DataGenerator("datasets", "val", batch_size=val_batch_size)
 
         # Prepare the trainer object
         model = Trainer(model=self.model)
@@ -228,8 +238,19 @@ class SuperRes:
         # Compile the trainer object
         model.compile(optimizer=optimizer, loss=loss, metric=metric)
 
+        # Number of validation steps
+        val_size = len(val_generator)
+
         # model training
-        model.fit(train_generator(), epochs=10, workers=8, verbose=1)
+        model.fit(
+            train_generator(),
+            epochs=10,
+            workers=8,
+            verbose=1,
+            validation_data=val_generator(),
+            validation_steps=val_size,
+            validation_freq=1,
+        )
 
 
 if __name__ == "__main__":
