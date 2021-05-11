@@ -1,9 +1,17 @@
-"""Main module to define, compile and train the NN model"""
+"""
+    Main module to define, compile and train the NN model
+    Paper: https://arxiv.org/abs/2104.09497
+    Code Reference: https://github.com/haoyuc/A2N
+"""
+
+import os
 import sys
+from typing import List
 
 import tensorflow as tf
 import tensorflow.keras.layers as KL
 import tensorflow.keras.models as KM
+from tensorflow.keras.callbacks import Callback, LearningRateScheduler, ModelCheckpoint
 
 sys.path.append("./")
 from A2N.trainer.trainer import Trainer
@@ -209,12 +217,59 @@ class SuperRes:
 
         return KM.Model(inputs=input_tensor, outputs=output, name=name)
 
-    def train(self, train_batch_size: int = 2, val_batch_size: int = 2) -> None:
+    def callbacks(self) -> List[Callback]:
+        """method to compile all callbacks in one place
+
+        Returns:
+            List[Callback]: list of callbacks
+        """
+
+        def scheduler(
+            epoch: int, lr: float, gamma: float = 0.5, step: int = 200
+        ) -> float:
+            """learning rate scheduler
+
+            Args:
+                epoch (int): current epoch number
+                lr (float): [description]
+                gamma (float, optional): decay factor. Defaults to 0.5.
+                step (int, optional): lr decays after this many epochs. Defaults to 200.
+
+            Returns:
+                float: decayed lr
+            """
+            if not (epoch + 1) % step:
+                lr = lr * gamma
+
+            return lr
+
+        # Step decay callback
+        StepLR = LearningRateScheduler(schedule=scheduler, verbose=0)
+
+        # callback for saving model
+        save_model = ModelCheckpoint(
+            "save_model/model_{epoch:04d}_{val_PSNR:.4f}.h5",
+            monitor="val_PSNR",
+            save_best_only=True,
+            mode="max",
+        )
+
+        return [StepLR, save_model]
+
+    def train(
+        self,
+        train_batch_size: int = 2,
+        val_batch_size: int = 2,
+        lr: float = 5e-4,
+        epochs: int = 10,
+    ) -> None:
         """model training method
 
         Args:
             train_batch_size (int, optional): batch size for training epoch. Defaults to 2.
             val_batch_size (int, optional): batch size for validation epoch. Defaults to 2.
+            lr (float, optional): learning rate for optimizer. Defaults to 5e-4.
+            epochs (int, optional): number of training epochs. Defaults to 10.
         """
 
         # Get the generator objects
@@ -231,8 +286,8 @@ class SuperRes:
         model = Trainer(model=self.model)
 
         # Attributes for the trainer object
-        optimizer = tf.keras.optimizers.Adam()
-        loss = {"HR": tf.keras.losses.mse}
+        optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+        loss = {"HR": tf.keras.losses.mae}
         metric = {"HR": PSNRLayer()}
 
         # Compile the trainer object
@@ -241,15 +296,19 @@ class SuperRes:
         # Number of validation steps
         val_size = len(val_generator)
 
+        # Directory for storing the model file
+        os.makedirs("save_model", exist_ok=True)
+
         # model training
         model.fit(
             train_generator(),
-            epochs=10,
+            epochs=epochs,
             workers=8,
             verbose=1,
             validation_data=val_generator(),
             validation_steps=val_size,
             validation_freq=1,
+            callbacks=self.callbacks(),
         )
 
 
