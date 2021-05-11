@@ -20,7 +20,7 @@ class PSNRLayer(tf.keras.metrics.Metric):
         # Function for calculating the metric value
         self.m = PSNR(max_value=max_value)
 
-    def update_state(self, y_true, y_pred, sample_weight=None):
+    def update_state(self, y_true, y_pred, *args):
         # Metric values for a given batch
         metric_value = self.m(y_true, y_pred)
         # Number of samples in a given batch

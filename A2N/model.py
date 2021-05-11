@@ -135,7 +135,7 @@ class SuperRes:
 
     def build(
         self,
-        shape: tuple = (64, 64, 3),
+        shape: tuple = (None, None, 3),
         features: int = 40,
         up_features: int = 24,
         n_blocks: int = 16,
@@ -168,14 +168,11 @@ class SuperRes:
         x = KL.Conv2D(features, 3, strides=(1, 1), use_bias=True, padding="same")(x)
         fea = fea + x
 
-        # tensor resizer object
-        resizer = tf.compat.v1.image.resize
-
         # upscale the features
         if self.scale == 4:
             # 2X
-            fea = resizer(
-                fea, size=(int(shape[0] * 2), int(shape[1] * 2)), method="nearest"
+            fea = KL.UpSampling2D(size=(2, 2), interpolation="nearest", name="map2up")(
+                fea
             )
 
             fea = KL.Conv2D(up_features, 3, 1, use_bias=True, padding="same")(fea)
@@ -186,8 +183,8 @@ class SuperRes:
             fea = KL.LeakyReLU(alpha=0.2)(fea)
 
             # 4X
-            fea = resizer(
-                fea, size=(int(shape[0] * 4), int(shape[1] * 4)), method="nearest"
+            fea = KL.UpSampling2D(size=(2, 2), interpolation="nearest", name="map4up")(
+                fea
             )
 
             fea = KL.Conv2D(up_features, 3, 1, use_bias=True, padding="same")(fea)
@@ -202,12 +199,9 @@ class SuperRes:
         output = KL.Conv2D(shape[-1], 3, 1, use_bias=True, padding="same")(fea)
 
         # Upscale the input tensor
-        up_LR = resizer(
-            input_tensor,
-            size=(int(shape[0] * self.scale), int(shape[1] * self.scale)),
-            method="bilinear",
-            align_corners=False,
-        )
+        up_LR = KL.UpSampling2D(
+            size=(self.scale, self.scale), interpolation="bilinear", name="up_LR"
+        )(input_tensor)
 
         # HR reconstruction
         # pylint: disable=unnecessary-lambda
@@ -215,13 +209,23 @@ class SuperRes:
 
         return KM.Model(inputs=input_tensor, outputs=output, name=name)
 
-    def train(self) -> None:
-        """model training method"""
+    def train(self, train_batch_size: int = 2, val_batch_size: int = 2) -> None:
+        """model training method
 
-        # Get the generator object
+        Args:
+            train_batch_size (int, optional): batch size for training epoch. Defaults to 2.
+            val_batch_size (int, optional): batch size for validation epoch. Defaults to 2.
+        """
+
+        # Get the generator objects
         train_generator = DataGenerator(
-            "datasets", "train", scale=self.scale, shuffle=True
+            "datasets",
+            "train",
+            batch_size=train_batch_size,
+            scale=self.scale,
+            shuffle=True,
         )
+        val_generator = DataGenerator("datasets", "val", batch_size=val_batch_size)
 
         # Prepare the trainer object
         model = Trainer(model=self.model)
@@ -234,8 +238,19 @@ class SuperRes:
         # Compile the trainer object
         model.compile(optimizer=optimizer, loss=loss, metric=metric)
 
+        # Number of validation steps
+        val_size = len(val_generator)
+
         # model training
-        model.fit(train_generator(), epochs=10, workers=8, verbose=1)
+        model.fit(
+            train_generator(),
+            epochs=10,
+            workers=8,
+            verbose=1,
+            validation_data=val_generator(),
+            validation_steps=val_size,
+            validation_freq=1,
+        )
 
 
 if __name__ == "__main__":
