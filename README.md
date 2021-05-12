@@ -58,3 +58,8 @@ All the code executions shall happen from work directory.
   ```
   poetry run python A2N/start.py
   ```
+
+## Notes
+1. The current implementation provides the option of using [perceptual loss](https://arxiv.org/abs/1603.08155) along with _mae_ loss. To only use perceptual loss, please make necessary changes (in _A2N/model.py_ or _A2N/trainer/trainer.py_)
+2. Currently perceptual loss is implemented using _VGG19_. I might include other feature extractors as well.
+3. None of the hyperparameters are optimized as of now. 
