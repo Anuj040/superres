@@ -1,6 +1,7 @@
 """custom model trainer"""
 import tensorflow as tf
 import tensorflow.keras.models as KM
+
 from A2N.utils.losses import perceptual_layer
 
 

@@ -30,8 +30,8 @@ install:
 
 ## Format code using black
 format:
-	@poetry run black $(SRC) --config pyproject.toml
-	@poetry run isort $(SRC) --profile black
+	@poetry run black $(SRC) --config pyproject.toml --check
+	@poetry run isort $(SRC) --profile black --check
 
 ## type check using mypy
 check_type:
