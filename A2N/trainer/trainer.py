@@ -1,6 +1,7 @@
 """custom model trainer"""
 import tensorflow as tf
 import tensorflow.keras.models as KM
+from A2N.utils.losses import perceptual_layer
 
 
 class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
@@ -23,6 +24,7 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         optimizer: tf.keras.optimizers,
         loss: tf.keras.losses.Loss,
         metric=tf.keras.metrics.Metric,
+        perceptual: bool = False,
     ) -> None:
         # pylint: disable=attribute-defined-outside-init
         """compiles the model object with corresponding attributes
@@ -30,10 +32,14 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
             optimizer (tf.keras.optimizers): optimizer for model training
             loss (Dict[tf.keras.losses.Loss]): loss definitions for the model outputs
             loss (Dict[tf.keras.metrics.Metric]): performance metrics for model outputs
+            perceptual (bool, optional): use precpetual loss on latent feature. Defaults to False
         """
         super().compile()
         self.optimizer = optimizer
         self.loss = loss
+        if perceptual:
+            loss["percep"] = perceptual_layer()
+            metric["percep"] = None
         assert len(self.loss) == len(
             metric
         ), "provide metric functions for all outputs, 'None' wherever not applicable"
@@ -69,7 +75,10 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
             losses = []
             # calculate losses
             for _, key in enumerate(self.loss_keys):
-                losses.append(self.loss[key](HR, model_outputs))
+                if key == "percep":
+                    losses.append(self.loss[key]([HR, model_outputs], training=False))
+                else:
+                    losses.append(self.loss[key](HR, model_outputs))
 
         # calculate and apply gradients
         grads = tape.gradient(

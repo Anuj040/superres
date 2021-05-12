@@ -262,6 +262,7 @@ class SuperRes:
         val_batch_size: int = 2,
         lr: float = 5e-4,
         epochs: int = 10,
+        perceptual: bool = False,
     ) -> None:
         """model training method
 
@@ -270,6 +271,7 @@ class SuperRes:
             val_batch_size (int, optional): batch size for validation epoch. Defaults to 2.
             lr (float, optional): learning rate for optimizer. Defaults to 5e-4.
             epochs (int, optional): number of training epochs. Defaults to 10.
+            perceptual (bool, optional): use precpetual loss on latent features. Defaults to False
         """
 
         # Get the generator objects
@@ -291,7 +293,9 @@ class SuperRes:
         metric = {"HR": PSNRLayer()}
 
         # Compile the trainer object
-        model.compile(optimizer=optimizer, loss=loss, metric=metric)
+        model.compile(
+            optimizer=optimizer, loss=loss, metric=metric, perceptual=perceptual
+        )
 
         # Number of validation steps
         val_size = len(val_generator)
