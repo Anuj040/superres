@@ -13,6 +13,9 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         KM.Model: parent class
     """
 
+    # pylint: disable=too-many-instance-attributes
+    # pylint: disable=too-many-locals
+
     def __init__(self, model: KM.Model, mode: str = "norm") -> None:
         """
         Args:
@@ -58,7 +61,9 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         if self.mode == "gan":
 
             # optimizer and loss fn. for gan training
-            self.d_optimizer = optimizer
+            self.d_optimizer = tf.keras.optimizers.Adam(
+                learning_rate=1e-5, beta_1=0.0, beta_2=0.9  # Default values from A2N
+            )
             self.d_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
