@@ -38,13 +38,15 @@ class SaveModel(Callback):
             logs (dict): performance logs
         """
         metric = logs[self.metric]
-        if self.mode == "max" and metric > self.thresh:
-            self.model.model.save(f"save_model/model_{metric:.4f}.h5")
-            K.set_value(self.thresh, metric)
+        if self.mode == "max":
+            if metric > self.thresh:
+                self.model.model.save(f"save_model/model_{epoch+1:04d}_{metric:.4f}.h5")
+                K.set_value(self.thresh, metric)
 
-        elif self.mode == "min" and metric < self.thresh:
-            self.model.model.save(f"save_model/model_{epoch:04d}_{metric:.4f}.h5")
-            K.set_value(self.thresh, metric)
+        elif self.mode == "min":
+            if metric < self.thresh:
+                self.model.model.save(f"save_model/model_{epoch+1:04d}_{metric:.4f}.h5")
+                K.set_value(self.thresh, metric)
         else:
             raise NotImplementedError(
                 f"{self.mode} mode has not been implemented for this callback"
