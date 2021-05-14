@@ -17,3 +17,4 @@ disable=C0103, # variable naming conventions (example: x for model layer outputs
         R0913, # Number of arguments in a method (example: model building method)
         W0221, # Different parameters from overridden method
         C0413, # Wrong import position (internal dependencies after setting sys.path)
+        W0222, # signature differ from overridden method
