@@ -5,6 +5,7 @@
 """
 
 import os
+import re
 import sys
 from typing import List
 
@@ -41,7 +42,7 @@ def AAM(
     """
 
     # pylint: disable=unnecessary-lambda
-    x = KL.Lambda(lambda x: tf.reduce_mean(x, axis=(1, 2), keepdims=True))(input_tensor)
+    x = tf.reduce_mean(input_tensor, axis=(1, 2), keepdims=True)
     x = KL.Dense(features // reduction, use_bias=False)(x)
     x = KL.Activation("relu")(x)
     x = KL.Dense(n_branch, use_bias=False)(x)
@@ -134,13 +135,39 @@ def pixel_attention(input_tensor: tf.Tensor, features: int = 24) -> tf.Tensor:
 class SuperRes:
     """super-resolution model class"""
 
-    def __init__(self, scale: int = 4) -> None:
+    def __init__(self, scale: int = 4, model_path: str = None) -> None:
         """
         Args:
             scale (int, optional): upscale factor for the input image. Defaults to 4.
+            model_path (str, optional): Path to model files. Default None
         """
         self.scale = scale
         self.model = self.build(name="superres")
+
+        self.epoch = 0  # Initial epoch
+        self.thresh = 0.0  # Initializing the model metric threshhold
+        if model_path:
+            self.model_path = model_path
+            self.set_epoch(model_path)
+
+    def set_epoch(self, path: str) -> None:
+        """method to reset the starting epoch number and model performance metric threshhold
+
+        Args:
+            path (str): model path string
+        """
+
+        split = re.split(r"/", path)
+        e = [a for a in split if "model_" in a][0].replace(".h5", "")
+        e = re.findall(r"[-+]?\d*\.\d+|\d+", e)
+
+        # reset the epoch number and performance metric
+        self.epoch = int(e[0])
+        self.thresh = float(e[1])
+
+    def load_model(self) -> None:
+        """method to load the model parameters from saved .h5 file"""
+        self.model = KM.load_model(self.model_path)
 
     def build(
         self,
@@ -248,7 +275,7 @@ class SuperRes:
         StepLR = LearningRateScheduler(schedule=scheduler, verbose=0)
 
         # custom callback for saving model
-        save_model = SaveModel(metric="val_PSNR", mode="mean")
+        save_model = SaveModel(metric="val_PSNR", mode="max", thresh=self.thresh)
         return [StepLR, save_model]
 
     def train(
@@ -302,6 +329,7 @@ class SuperRes:
         model.fit(
             train_generator(),
             epochs=epochs,
+            initial_epoch=self.epoch,
             workers=8,
             verbose=1,
             validation_data=val_generator(),
@@ -312,5 +340,6 @@ class SuperRes:
 
 
 if __name__ == "__main__":
-    superres = SuperRes()
+    superres = SuperRes(model_path="save_model/model_0001_22.1603.h5")
+    superres.load_model()
     superres.train()
