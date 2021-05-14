@@ -2,6 +2,7 @@
 import tensorflow as tf
 import tensorflow.keras.models as KM
 
+from A2N.model_utils.gan import Discriminator
 from A2N.utils.losses import perceptual_layer
 
 
@@ -12,13 +13,20 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         KM.Model: parent class
     """
 
-    def __init__(self, model: KM.Model) -> None:
+    def __init__(self, model: KM.Model, mode: str = "norm") -> None:
         """
         Args:
             model (KM.Model): super-resolution model
+            mode (str, optional): training mode. One of ["norm", "gan"]
         """
         super().__init__()
         self.model = model
+        assert mode in ["norm", "gan"], "only 'norm' or 'gan' train mode"
+
+        if mode == "gan":
+            # Discriminator model for GAN training
+            self.discriminator = Discriminator()
+        self.mode = mode
 
     def compile(
         self,
@@ -46,6 +54,12 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         ), "provide metric functions for all outputs, 'None' wherever not applicable"
         self.loss_metrics = metric
         self.loss_keys = loss.keys()
+
+        if self.mode == "gan":
+
+            # optimizer and loss fn. for gan training
+            self.d_optimizer = optimizer
+            self.d_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         """method to process model call
@@ -81,6 +95,13 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
                 else:
                     losses.append(self.loss[key](HR, model_outputs))
 
+            if self.mode == "gan":
+                d_gen = self.discriminator(model_outputs)
+
+                # Disc score loss for generator update
+                g_loss = self.d_loss(d_gen, tf.ones_like(d_gen))
+                losses.append(g_loss)
+
         # calculate and apply gradients
         grads = tape.gradient(
             losses,
@@ -89,7 +110,7 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
 
         # prepare the logs dictionary
-        logs = dict(zip(self.loss_keys, losses))
+        logs = dict(zip(self.loss_keys, losses[:-1] if self.mode == "gan" else losses))
         logs = {key: tf.reduce_mean(value) for key, value in logs.items()}
 
         # Add metrics if applicable
@@ -103,6 +124,31 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
 
         # House-keeping
         del tape
+
+        if self.mode == "gan":
+            # Discriminator training
+            # build the graph
+            with tf.GradientTape() as tape:
+                d_gen = self.discriminator(model_outputs)
+                d_HR = self.discriminator(HR)
+
+                # Disc score loss on generated and gt images
+                d_loss = self.d_loss(d_gen, tf.zeros_like(d_gen)) + self.d_loss(
+                    d_HR, tf.ones_like(d_HR)
+                )
+
+            # calculate and apply gradients
+            grads = tape.gradient(
+                [d_loss],
+                self.discriminator.trainable_weights,
+            )
+            self.d_optimizer.apply_gradients(
+                zip(grads, self.discriminator.trainable_weights)
+            )
+            logs["d_loss"] = d_loss
+            # House - keeping
+            del tape
+
         return logs
 
     @property
