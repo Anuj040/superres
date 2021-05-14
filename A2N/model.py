@@ -41,7 +41,6 @@ def AAM(
         tf.Tensor: attention weights for respective branches
     """
 
-    # pylint: disable=unnecessary-lambda
     x = tf.reduce_mean(input_tensor, axis=(1, 2), keepdims=True)
     x = KL.Dense(features // reduction, use_bias=False)(x)
     x = KL.Activation("relu")(x)
@@ -167,7 +166,7 @@ class SuperRes:
 
     def load_model(self) -> None:
         """method to load the model parameters from saved .h5 file"""
-        self.model = KM.load_model(self.model_path)
+        self.model = KM.load_model(self.model_path, custom_objects={"tf": tf})
 
     def build(
         self,
