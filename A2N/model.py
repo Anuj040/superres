@@ -11,10 +11,11 @@ from typing import List
 import tensorflow as tf
 import tensorflow.keras.layers as KL
 import tensorflow.keras.models as KM
-from tensorflow.keras.callbacks import Callback, LearningRateScheduler, ModelCheckpoint
+from tensorflow.keras.callbacks import Callback, LearningRateScheduler
 
 sys.path.append("./")
 from A2N.trainer.trainer import Trainer
+from A2N.utils.callbacks import SaveModel
 from A2N.utils.generator import DataGenerator
 from A2N.utils.losses import PSNRLayer
 
@@ -246,14 +247,8 @@ class SuperRes:
         # Step decay callback
         StepLR = LearningRateScheduler(schedule=scheduler, verbose=0)
 
-        # callback for saving model
-        save_model = ModelCheckpoint(
-            "save_model/model_{epoch:04d}_{val_PSNR:.4f}.h5",
-            monitor="val_PSNR",
-            save_best_only=True,
-            mode="max",
-        )
-
+        # custom callback for saving model
+        save_model = SaveModel(metric="val_PSNR", mode="mean")
         return [StepLR, save_model]
 
     def train(
