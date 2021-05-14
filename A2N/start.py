@@ -14,6 +14,7 @@ flags.DEFINE_integer("val_batch_size", 2, "validation batch size")
 flags.DEFINE_integer("epochs", 10, "training epochs")
 flags.DEFINE_boolean("percep", False, "pereceptual loss on latent features")
 flags.DEFINE_string("load_model", None, "path to saved model file")
+flags.DEFINE_boolean("gan", False, "include GAN training")
 
 
 def main(argv):  # pylint: disable = W0613
@@ -31,6 +32,7 @@ def main(argv):  # pylint: disable = W0613
             lr=FLAGS.lr,
             epochs=FLAGS.epochs,
             perceptual=FLAGS.percep,
+            gan=FLAGS.gan,
         )
 
 
