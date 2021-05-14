@@ -5,7 +5,7 @@ Currently, it is the bare minimum (_default args on the original repository_) im
 code or leave comments if you find any inconsitency.
 
 ## Environment
-* tensorflow == 2.4.1
+* tensorflow == 2.4.1 (checked with 2.5.0)
 * tensorflow-datasets == 4.3.0
 
 ## Installation Guideline
