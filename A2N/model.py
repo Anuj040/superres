@@ -284,6 +284,7 @@ class SuperRes:
         lr: float = 5e-4,
         epochs: int = 10,
         perceptual: bool = False,
+        gan: bool = False,
     ) -> None:
         """model training method
 
@@ -306,7 +307,7 @@ class SuperRes:
         val_generator = DataGenerator("datasets", "val", batch_size=val_batch_size)
 
         # Prepare the trainer object
-        model = Trainer(model=self.model)
+        model = Trainer(model=self.model, mode="gan" if gan else "norm")
 
         # Attributes for the trainer object
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
