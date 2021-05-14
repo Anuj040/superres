@@ -50,7 +50,7 @@ def Discriminator(features: int = 64, depth: int = 7) -> KM.Model:
         KM.Model: discriminator model
     """
 
-    input_tensor = KL.Input(shape=(256, 256, 3))
+    input_tensor = KL.Input(shape=(None, None, 3))
 
     act = KL.LeakyReLU(alpha=0.2)
 
@@ -67,8 +67,7 @@ def Discriminator(features: int = 64, depth: int = 7) -> KM.Model:
     score = KL.Dense(1024)(act(score))
 
     # Reshape into 1D score vectors
-    shape = tf.shape(score)
-    score = tf.reshape(score, shape=(shape[0], -1), name="d_score")
+    score = KL.Flatten(name="d_score")(score)
 
     return KM.Model(inputs=input_tensor, outputs=score)
 
