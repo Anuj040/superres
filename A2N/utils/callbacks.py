@@ -37,7 +37,9 @@ class SaveModel(Callback):
             epoch (int): epoch number
             logs (dict): performance logs
         """
-        metric = logs[self.metric]
+        # Metric calculated once per "n" epochs
+        metric = logs.get(self.metric, 0.0)
+
         if self.mode == "max":
             if metric > self.thresh:
                 self.model.model.save(f"save_model/model_{epoch+1:04d}_{metric:.4f}.h5")
