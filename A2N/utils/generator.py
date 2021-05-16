@@ -21,6 +21,33 @@ def dimension_adjuster(
     )
 
 
+def random_apply(func, p: float, image: tf.Tensor) -> tf.Tensor:
+    """Randomly apply function func to image with probability p."""
+
+    return tf.cond(
+        tf.less(
+            tf.random.uniform([], minval=0, maxval=1, dtype=tf.float32),
+            tf.cast(p, tf.float32),
+        ),
+        lambda: func(image),
+        lambda: image,
+    )
+
+
+def random_rotate(image: tf.Tensor) -> tf.Tensor:
+    """method to randomly rotate the image through [1, 2, 3]*90 degrees
+
+    Args:
+        image (tf.Tensor): Image tensor
+
+    Returns:
+        tf.Tensor: rotated image tensor
+    """
+    # get the multiple of 90
+    k = tf.random.uniform([], minval=1, maxval=4, dtype=tf.int32)
+    return tf.image.rot90(image, k=k)
+
+
 class DataGenerator:
     """Datagenerator class"""
 
@@ -31,6 +58,7 @@ class DataGenerator:
         batch_size: int = 2,
         scale: int = 4,
         shuffle: bool = False,
+        augment: bool = False,
     ) -> None:
         """Method to build the dataset generator object
 
@@ -40,9 +68,11 @@ class DataGenerator:
             batch_size (int, optional): Batch size for the model. Defaults to 2.
             scale (int, optional): Image upsampling ratio. Defaults to 4.
             shuffle (bool, optional): whether to shuffle the data files. Defaults to False.
+            augment (bool, optional): Use data augmentation. Defaults to False.
         """
         self.scale = scale
         self.epoch_size = 0
+        self.augment = augment
 
         if split == "train":
             # Make single image object retriever function
@@ -131,6 +161,10 @@ class DataGenerator:
             element["image"],
             size=(256, 256, 3),
         )
+        if self.augment:
+            image = random_apply(random_rotate, 0.5, image)
+            image = random_apply(tf.image.flip_left_right, 0.5, image)
+
         # HR image (-1.0, 1.0)
         image = 2.0 * tf.cast(image, tf.float32) / 255.0 - 1.0
 

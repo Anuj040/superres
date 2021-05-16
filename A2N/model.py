@@ -308,6 +308,7 @@ class SuperRes:
             batch_size=train_batch_size,
             scale=self.scale,
             shuffle=True,
+            augment=True,
         )
         val_generator = DataGenerator("datasets", "val", batch_size=val_batch_size)
 
