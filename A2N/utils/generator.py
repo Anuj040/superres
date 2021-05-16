@@ -113,6 +113,7 @@ class DataGenerator:
                 else val_size // batch_size
             )
 
+        dataset = dataset.prefetch(20)
         self.dataset = dataset
 
     def pair_maker(self, element: dict) -> Tuple[tf.Tensor, tf.Tensor]:
@@ -125,8 +126,13 @@ class DataGenerator:
             Tuple[tf.Tensor, tf.Tensor]: Pair of HR-LR images
         """
 
-        # Get the image array # HR image (-1.0, 1.0)
-        image = 2.0 * tf.cast(element["image"], tf.float32) / 255.0 - 1.0
+        # Get the image crop of given size
+        image = tf.image.random_crop(
+            element["image"],
+            size=(256, 256, 3),
+        )
+        # HR image (-1.0, 1.0)
+        image = 2.0 * tf.cast(image, tf.float32) / 255.0 - 1.0
 
         # shape of original image
         shape = tf.shape(image)
