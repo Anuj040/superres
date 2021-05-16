@@ -20,6 +20,11 @@ from A2N.utils.callbacks import SaveModel
 from A2N.utils.generator import DataGenerator
 from A2N.utils.losses import PSNRLayer
 
+gpu_devices = tf.config.experimental.list_physical_devices("GPU")
+
+if len(gpu_devices) > 0:
+    tf.config.experimental.set_memory_growth(gpu_devices[0], True)
+
 
 def AAM(
     input_tensor: tf.Tensor,
@@ -179,7 +184,7 @@ class SuperRes:
         """super-resolution model builder
 
         Args:
-            shape (tuple, optional): input image size. Defaults to (64, 64, 3).
+            shape (tuple, optional): input image size. Defaults to (None, None, 3).
             features (int, optional): features in attention truck. Defaults to 40.
             up_features (int, optional): features for upsampling blocks. Defaults to 24.
             n_blocks (int, optional): number of AAB blocks. Defaults to 16.
@@ -331,10 +336,11 @@ class SuperRes:
             epochs=epochs,
             initial_epoch=self.epoch,
             workers=8,
-            verbose=1,
+            verbose=2,
+            max_queue_size=100,
             validation_data=val_generator(),
             validation_steps=val_size,
-            validation_freq=1,
+            validation_freq=2,
             callbacks=self.callbacks(),
         )
 
