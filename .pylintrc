@@ -18,3 +18,5 @@ disable=C0103, # variable naming conventions (example: x for model layer outputs
         W0221, # Different parameters from overridden method
         C0413, # Wrong import position (internal dependencies after setting sys.path)
         W0222, # signature differ from overridden method
+        E1123, # unexpected keyword args
+        R0914, # Too many local variables
