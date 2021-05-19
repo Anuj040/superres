@@ -279,7 +279,9 @@ class SuperRes:
         StepLR = LearningRateScheduler(schedule=scheduler, verbose=0)
 
         # custom callback for saving model
-        save_model = SaveModel(metric="val_PSNR", mode="max", thresh=self.thresh)
+        save_model = SaveModel(
+            metric="val_PSNR", mode="max", thresh=self.thresh, path="save_model"
+        )
         return [StepLR, save_model]
 
     def train(
@@ -341,7 +343,7 @@ class SuperRes:
             max_queue_size=100,
             validation_data=val_generator(),
             validation_steps=val_size,
-            validation_freq=2,
+            validation_freq=5,
             callbacks=self.callbacks(),
         )
 

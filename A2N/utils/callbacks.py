@@ -15,7 +15,11 @@ class SaveModel(Callback):
     """
 
     def __init__(
-        self, metric: str = "val_PSNR", mode: str = "max", thresh: float = 0.0
+        self,
+        metric: str = "val_PSNR",
+        mode: str = "max",
+        thresh: float = 0.0,
+        path: str = "save_model",
     ) -> None:
         """initialize the model save callback
 
@@ -23,12 +27,14 @@ class SaveModel(Callback):
             metric (str, optional): metric to be tracked. Defaults to "val_PSNR".
             mode (str, optional): desired trend for the metric. Defaults to "max".
             thresh (float, optional): thresholding the metric value. Defaults to 0.0.
+            path (str, optional): model save directory. Defaults to "save_model".
         """
 
         super().__init__()
         self.metric = metric
         self.mode = mode
         self.thresh = K.variable(thresh)
+        self.path = path
 
     def on_epoch_end(self, epoch: int, logs: dict):
         """executes the callback on epoch end
@@ -42,12 +48,16 @@ class SaveModel(Callback):
 
         if self.mode == "max":
             if metric > self.thresh:
-                self.model.model.save(f"save_model/model_{epoch+1:04d}_{metric:.4f}.h5")
+                self.model.model.save(
+                    f"{self.path}/model_{epoch+1:04d}_{metric:.4f}.h5"
+                )
                 K.set_value(self.thresh, metric)
 
         elif self.mode == "min":
             if metric < self.thresh:
-                self.model.model.save(f"save_model/model_{epoch+1:04d}_{metric:.4f}.h5")
+                self.model.model.save(
+                    f"{self.path}/model_{epoch+1:04d}_{metric:.4f}.h5"
+                )
                 K.set_value(self.thresh, metric)
         else:
             raise NotImplementedError(
