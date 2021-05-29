@@ -82,10 +82,14 @@ class DataGenerator:
             )
             # Make image pairs
             dataset = dataset.map(
-                self.pair_maker, num_parallel_calls=tf.data.experimental.AUTOTUNE
+                self.crop_taker, num_parallel_calls=tf.data.experimental.AUTOTUNE
             )
             # Make batches
             dataset = dataset.batch(batch_size, drop_remainder=split == "train")
+
+            dataset = dataset.map(
+                self.pair_maker, num_parallel_calls=tf.data.experimental.AUTOTUNE
+            )
 
         elif split == "val":
             LR_datagen = ImageDataGenerator()
@@ -146,14 +150,14 @@ class DataGenerator:
         dataset = dataset.prefetch(20)
         self.dataset = dataset
 
-    def pair_maker(self, element: dict) -> Tuple[tf.Tensor, tf.Tensor]:
-        """method to generate a pair of high resolution (HR) and low resolution (LR) images
+    def crop_taker(self, element: dict) -> tf.Tensor:
+        """method to extract a random crop of high resolution (HR) image
 
         Args:
             element (dict): Input object containing image and associated attributes
 
         Returns:
-            Tuple[tf.Tensor, tf.Tensor]: Pair of HR-LR images
+            tf.Tensor: Image crop
         """
 
         # Get the image crop of given size
@@ -168,17 +172,29 @@ class DataGenerator:
         # HR image (-1.0, 1.0)
         image = 2.0 * tf.cast(image, tf.float32) / 255.0 - 1.0
 
+        return image
+
+    def pair_maker(self, images: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+        """method to generate a pair of high resolution (HR) and low resolution (LR) images
+
+        Args:
+            images (tf.Tensor): Batch of Augmented HR image crop
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor]: Pair of HR-LR images
+        """
+
         # shape of original image
-        shape = tf.shape(image)
+        shape = tf.shape(images)
 
         # dimensions of scaled down image
-        lr_h = shape[0] // self.scale
-        lr_w = shape[1] // self.scale
+        lr_h = shape[1] // self.scale
+        lr_w = shape[2] // self.scale
 
         # LR image
-        image_small = tf.image.resize(image, size=(lr_h, lr_w), method="bicubic")
+        images_small = tf.image.resize(images, size=(lr_h, lr_w), method="bicubic")
 
-        return image_small, image
+        return images_small, images
 
     def __call__(self, *args: Any, **kwds: Any) -> tf.data.Dataset:
         """Method to return the generator object
