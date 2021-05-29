@@ -65,3 +65,48 @@ class SaveModel(Callback):
             )
 
         return super().on_epoch_end(epoch, logs=logs)
+
+
+def scheduler(epoch: int, lr: float, gamma: float = 0.5, step: int = 200) -> float:
+    """learning rate scheduler
+
+    Args:
+        epoch (int): current epoch number
+        lr (float): [description]
+        gamma (float, optional): decay factor. Defaults to 0.5.
+        step (int, optional): lr decays after this many epochs. Defaults to 200.
+
+    Returns:
+        float: decayed lr
+    """
+    if not (epoch + 1) % step:
+        lr = lr * gamma
+
+    return lr
+
+
+class LR_Scheduler(Callback):
+    """custom learning rate scheduler callback"""
+
+    def __init__(self, gamma: float = 0.5, step: int = 200):
+        """
+        Args:
+            gamma (float, optional): decay factor. Defaults to 0.5.
+            step (int, optional): lr decays after this many epochs. Defaults to 200.
+        """
+        super().__init__()
+        self.gamma = gamma
+        self.step = step
+
+    def on_epoch_begin(self, epoch: int, logs: dict = None) -> None:
+        """update the learning rate at the start of the epoch"""
+
+        # Update lr for discriminator
+        lr = K.get_value(self.model.d_optimizer.lr)
+        lr = scheduler(epoch, lr, self.gamma, self.step)
+        K.set_value(self.model.d_optimizer.lr, lr)
+
+        # Update lr for generator
+        lr = K.get_value(self.model.optimizer.lr)
+        lr = scheduler(epoch, lr, self.gamma, self.step)
+        K.set_value(self.model.optimizer.lr, lr)
