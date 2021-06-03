@@ -16,7 +16,7 @@ from tensorflow.keras.callbacks import Callback, LearningRateScheduler
 
 sys.path.append("./")
 from A2N.trainer.trainer import Trainer
-from A2N.utils.callbacks import SaveModel
+from A2N.utils.callbacks import LR_Scheduler, SaveModel
 from A2N.utils.generator import DataGenerator
 from A2N.utils.losses import PSNRLayer
 
@@ -249,8 +249,13 @@ class SuperRes:
 
         return KM.Model(inputs=input_tensor, outputs=output, name=name)
 
-    def callbacks(self) -> List[Callback]:
+    def callbacks(
+        self,
+        gan: bool = False,
+    ) -> List[Callback]:
         """method to compile all callbacks in one place
+        Args:
+            gan (bool, optional): use adversarial loss. Defaults to False.
 
         Returns:
             List[Callback]: list of callbacks
@@ -276,7 +281,11 @@ class SuperRes:
             return lr
 
         # Step decay callback
-        StepLR = LearningRateScheduler(schedule=scheduler, verbose=0)
+        StepLR = (
+            LR_Scheduler()
+            if gan
+            else LearningRateScheduler(schedule=scheduler, verbose=0)
+        )
 
         # custom callback for saving model
         save_model = SaveModel(
@@ -301,6 +310,7 @@ class SuperRes:
             lr (float, optional): learning rate for optimizer. Defaults to 5e-4.
             epochs (int, optional): number of training epochs. Defaults to 10.
             perceptual (bool, optional): use precpetual loss on latent features. Defaults to False
+            gan (bool, optional): use adversarial loss. Defaults to False.
         """
 
         # Get the generator objects
@@ -330,9 +340,6 @@ class SuperRes:
         # Number of validation steps
         val_size = len(val_generator)
 
-        # Directory for storing the model file
-        os.makedirs("save_model", exist_ok=True)
-
         # model training
         model.fit(
             train_generator(),
@@ -344,7 +351,7 @@ class SuperRes:
             validation_data=val_generator(),
             validation_steps=val_size,
             validation_freq=5,
-            callbacks=self.callbacks(),
+            callbacks=self.callbacks(gan=gan),
         )
 
 
