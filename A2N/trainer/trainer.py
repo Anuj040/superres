@@ -38,16 +38,16 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         optimizer: tf.keras.optimizers,
         loss: Dict[str, tf.keras.losses.Loss],
         loss_weights: Dict[str, float],
-        metric=tf.keras.metrics.Metric,
+        metric=Dict[str, tf.keras.metrics.Metric],
         perceptual: bool = False,
     ) -> None:
         # pylint: disable=attribute-defined-outside-init
         """compiles the model object with corresponding attributes
         Args:
             optimizer (tf.keras.optimizers): optimizer for model training
-            loss (Dict[tf.keras.losses.Loss]): loss definitions for the model outputs
-            loss_weights (Dict[float]): weights for each loss definition
-            metric (Dict[tf.keras.metrics.Metric]): performance metrics for model outputs
+            loss (Dict[str, tf.keras.losses.Loss]): loss definitions for the model outputs
+            loss_weights (Dict[str, float]): weights for each loss definition
+            metric (Dict[str, tf.keras.metrics.Metric]): performance metrics for model outputs
             perceptual (bool, optional): use precpetual loss on latent feature. Defaults to False
         """
         super().compile()
