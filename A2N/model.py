@@ -4,7 +4,6 @@
     Code Reference: https://github.com/haoyuc/A2N
 """
 
-import os
 import re
 import sys
 from typing import List
@@ -18,7 +17,7 @@ sys.path.append("./")
 from A2N.trainer.trainer import Trainer
 from A2N.utils.callbacks import LR_Scheduler, SaveModel
 from A2N.utils.generator import DataGenerator
-from A2N.utils.losses import PSNRLayer
+from A2N.utils.losses import PSNRLayer, sobel_loss
 
 gpu_devices = tf.config.experimental.list_physical_devices("GPU")
 
@@ -329,12 +328,17 @@ class SuperRes:
 
         # Attributes for the trainer object
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-        loss = {"HR": tf.keras.losses.mae}
-        metric = {"HR": PSNRLayer()}
+        loss = {"HR": tf.keras.losses.mae, "sob": sobel_loss()}
+        metric = {"HR": PSNRLayer(), "sob": None}
+        loss_weights = {"HR": 1.0, "sob": 1.0}
 
         # Compile the trainer object
         model.compile(
-            optimizer=optimizer, loss=loss, metric=metric, perceptual=perceptual
+            optimizer=optimizer,
+            loss=loss,
+            loss_weights=loss_weights,
+            metric=metric,
+            perceptual=perceptual,
         )
 
         # Number of validation steps
