@@ -56,7 +56,8 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         self.loss_weights = loss_weights
 
         if perceptual:
-            loss["percep"] = perceptual_layer()
+            self.loss["percep"] = perceptual_layer()
+            self.loss_weights["percep"] = 1e-4
             metric["percep"] = None
         assert len(self.loss) == len(
             metric
@@ -113,7 +114,7 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
 
                 # Disc score loss for generator update
                 g_loss = self.d_loss(d_gen, tf.ones_like(d_gen))
-                losses_grad.append(g_loss)
+                losses_grad.append(1e-7 * tf.reduce_mean(g_loss))
 
         # calculate and apply gradients
         grads = tape.gradient(
@@ -123,7 +124,9 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
         self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
 
         # prepare the logs dictionary
-        logs = dict(zip(self.loss_keys, losses[:-1] if self.mode == "gan" else losses))
+        logs = dict(
+            zip(self.loss_keys, losses_grad[:-1] if self.mode == "gan" else losses)
+        )
         logs = {key: tf.reduce_mean(value) for key, value in logs.items()}
 
         # Add metrics if applicable
@@ -146,9 +149,9 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
                 d_HR = self.discriminator(HR)
 
                 # Disc score loss on generated and gt images
-                d_loss = self.d_loss(d_gen, tf.zeros_like(d_gen)) + self.d_loss(
-                    d_HR, tf.ones_like(d_HR)
-                )
+                d_loss = 1e-7 * tf.reduce_mean(
+                    self.d_loss(d_gen, tf.zeros_like(d_gen))
+                ) + 1e-7 * tf.reduce_mean(self.d_loss(d_HR, tf.ones_like(d_HR)))
 
             # calculate and apply gradients
             grads = tape.gradient(
