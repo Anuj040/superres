@@ -65,3 +65,5 @@ All the code executions shall happen from work directory.
 3. To include the perceptual loss or gan in model training, please include ```--percep``` or ```--gan``` as command line arguments.
 4. The *loss weights* have been updated to the optimum for my dataset. 
 5. Including perceptual loss, slightly improves the model performance with insignificant change to epoch times. Whereas, *gan training* did not provide any appreciable adavantage. Moreover the epoch time was significantly longer (upto 1.8 times).
+6. Apart from the loss definitions used in the original implementation, _sobel loss_ has also been included in the training pipeline. This loss incentivises sharp 
+edges for crispier boundaries. In my implementation, it slightly improved the model performance.
