@@ -100,6 +100,33 @@ def perceptual_layer(weights: float = 1.0, drop: float = 0.5) -> KM.Model:
     return KM.Model(inputs=[input1, input2], outputs=error, name="vgg")
 
 
+def sobel_loss(weight: float = 1.0):
+    """custom layer to calculate sobel loss on generated images
+
+    Args:
+        weight (float, optional): weighing factor. Defaults to 1.0.
+
+    Returns:
+        loss function
+    """
+
+    def _loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        """sobel loss calculating function
+
+        Args:
+            y_true (tf.Tensor): Ground truth image tensor
+            y_pred (tf.Tensor): Generated image tensor
+
+        Returns:
+            tf.Tensor: loss
+        """
+        error = tf.image.sobel_edges(y_true) - tf.image.sobel_edges(y_pred)
+        return weight * K.mean(tf.abs(error))
+
+    _loss.__name__ = "sobel"
+    return _loss
+
+
 if __name__ == "__main__":
     loss_fn = perceptual_layer()
     a = tf.random.uniform(shape=(2, 256, 256, 3), dtype=tf.float32)

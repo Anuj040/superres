@@ -15,7 +15,11 @@ class SaveModel(Callback):
     """
 
     def __init__(
-        self, metric: str = "val_PSNR", mode: str = "max", thresh: float = 0.0
+        self,
+        metric: str = "val_PSNR",
+        mode: str = "max",
+        thresh: float = 0.0,
+        path: str = "save_model",
     ) -> None:
         """initialize the model save callback
 
@@ -23,12 +27,14 @@ class SaveModel(Callback):
             metric (str, optional): metric to be tracked. Defaults to "val_PSNR".
             mode (str, optional): desired trend for the metric. Defaults to "max".
             thresh (float, optional): thresholding the metric value. Defaults to 0.0.
+            path (str, optional): model save directory. Defaults to "save_model".
         """
 
         super().__init__()
         self.metric = metric
         self.mode = mode
         self.thresh = K.variable(thresh)
+        self.path = path
 
     def on_epoch_end(self, epoch: int, logs: dict):
         """executes the callback on epoch end
@@ -37,15 +43,21 @@ class SaveModel(Callback):
             epoch (int): epoch number
             logs (dict): performance logs
         """
-        metric = logs[self.metric]
+        # Metric calculated once per "n" epochs
+        metric = logs.get(self.metric, 0.0)
+
         if self.mode == "max":
             if metric > self.thresh:
-                self.model.model.save(f"save_model/model_{epoch+1:04d}_{metric:.4f}.h5")
+                self.model.model.save(
+                    f"{self.path}/model_{epoch+1:04d}_{metric:.4f}.h5"
+                )
                 K.set_value(self.thresh, metric)
 
         elif self.mode == "min":
             if metric < self.thresh:
-                self.model.model.save(f"save_model/model_{epoch+1:04d}_{metric:.4f}.h5")
+                self.model.model.save(
+                    f"{self.path}/model_{epoch+1:04d}_{metric:.4f}.h5"
+                )
                 K.set_value(self.thresh, metric)
         else:
             raise NotImplementedError(
@@ -53,3 +65,48 @@ class SaveModel(Callback):
             )
 
         return super().on_epoch_end(epoch, logs=logs)
+
+
+def scheduler(epoch: int, lr: float, gamma: float = 0.5, step: int = 200) -> float:
+    """learning rate scheduler
+
+    Args:
+        epoch (int): current epoch number
+        lr (float): [description]
+        gamma (float, optional): decay factor. Defaults to 0.5.
+        step (int, optional): lr decays after this many epochs. Defaults to 200.
+
+    Returns:
+        float: decayed lr
+    """
+    if not (epoch + 1) % step:
+        lr = lr * gamma
+
+    return lr
+
+
+class LR_Scheduler(Callback):
+    """custom learning rate scheduler callback"""
+
+    def __init__(self, gamma: float = 0.5, step: int = 200):
+        """
+        Args:
+            gamma (float, optional): decay factor. Defaults to 0.5.
+            step (int, optional): lr decays after this many epochs. Defaults to 200.
+        """
+        super().__init__()
+        self.gamma = gamma
+        self.step = step
+
+    def on_epoch_begin(self, epoch: int, logs: dict = None) -> None:
+        """update the learning rate at the start of the epoch"""
+
+        # Update lr for discriminator
+        lr = K.get_value(self.model.d_optimizer.lr)
+        lr = scheduler(epoch, lr, self.gamma, self.step)
+        K.set_value(self.model.d_optimizer.lr, lr)
+
+        # Update lr for generator
+        lr = K.get_value(self.model.optimizer.lr)
+        lr = scheduler(epoch, lr, self.gamma, self.step)
+        K.set_value(self.model.optimizer.lr, lr)

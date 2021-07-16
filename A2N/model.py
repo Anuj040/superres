@@ -4,7 +4,6 @@
     Code Reference: https://github.com/haoyuc/A2N
 """
 
-import os
 import re
 import sys
 from typing import List
@@ -16,9 +15,14 @@ from tensorflow.keras.callbacks import Callback, LearningRateScheduler
 
 sys.path.append("./")
 from A2N.trainer.trainer import Trainer
-from A2N.utils.callbacks import SaveModel
+from A2N.utils.callbacks import LR_Scheduler, SaveModel
 from A2N.utils.generator import DataGenerator
-from A2N.utils.losses import PSNRLayer
+from A2N.utils.losses import PSNRLayer, sobel_loss
+
+gpu_devices = tf.config.experimental.list_physical_devices("GPU")
+
+if len(gpu_devices) > 0:
+    tf.config.experimental.set_memory_growth(gpu_devices[0], True)
 
 
 def AAM(
@@ -179,7 +183,7 @@ class SuperRes:
         """super-resolution model builder
 
         Args:
-            shape (tuple, optional): input image size. Defaults to (64, 64, 3).
+            shape (tuple, optional): input image size. Defaults to (None, None, 3).
             features (int, optional): features in attention truck. Defaults to 40.
             up_features (int, optional): features for upsampling blocks. Defaults to 24.
             n_blocks (int, optional): number of AAB blocks. Defaults to 16.
@@ -244,8 +248,13 @@ class SuperRes:
 
         return KM.Model(inputs=input_tensor, outputs=output, name=name)
 
-    def callbacks(self) -> List[Callback]:
+    def callbacks(
+        self,
+        gan: bool = False,
+    ) -> List[Callback]:
         """method to compile all callbacks in one place
+        Args:
+            gan (bool, optional): use adversarial loss. Defaults to False.
 
         Returns:
             List[Callback]: list of callbacks
@@ -271,10 +280,16 @@ class SuperRes:
             return lr
 
         # Step decay callback
-        StepLR = LearningRateScheduler(schedule=scheduler, verbose=0)
+        StepLR = (
+            LR_Scheduler()
+            if gan
+            else LearningRateScheduler(schedule=scheduler, verbose=0)
+        )
 
         # custom callback for saving model
-        save_model = SaveModel(metric="val_PSNR", mode="max", thresh=self.thresh)
+        save_model = SaveModel(
+            metric="val_PSNR", mode="max", thresh=self.thresh, path="save_model"
+        )
         return [StepLR, save_model]
 
     def train(
@@ -294,6 +309,7 @@ class SuperRes:
             lr (float, optional): learning rate for optimizer. Defaults to 5e-4.
             epochs (int, optional): number of training epochs. Defaults to 10.
             perceptual (bool, optional): use precpetual loss on latent features. Defaults to False
+            gan (bool, optional): use adversarial loss. Defaults to False.
         """
 
         # Get the generator objects
@@ -303,6 +319,7 @@ class SuperRes:
             batch_size=train_batch_size,
             scale=self.scale,
             shuffle=True,
+            augment=True,
         )
         val_generator = DataGenerator("datasets", "val", batch_size=val_batch_size)
 
@@ -311,19 +328,21 @@ class SuperRes:
 
         # Attributes for the trainer object
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-        loss = {"HR": tf.keras.losses.mae}
-        metric = {"HR": PSNRLayer()}
+        loss = {"HR": tf.keras.losses.mae, "sob": sobel_loss()}
+        metric = {"HR": PSNRLayer(), "sob": None}
+        loss_weights = {"HR": 1.0, "sob": 1.0}
 
         # Compile the trainer object
         model.compile(
-            optimizer=optimizer, loss=loss, metric=metric, perceptual=perceptual
+            optimizer=optimizer,
+            loss=loss,
+            loss_weights=loss_weights,
+            metric=metric,
+            perceptual=perceptual,
         )
 
         # Number of validation steps
         val_size = len(val_generator)
-
-        # Directory for storing the model file
-        os.makedirs("save_model", exist_ok=True)
 
         # model training
         model.fit(
@@ -331,11 +350,12 @@ class SuperRes:
             epochs=epochs,
             initial_epoch=self.epoch,
             workers=8,
-            verbose=1,
+            verbose=2,
+            max_queue_size=100,
             validation_data=val_generator(),
             validation_steps=val_size,
-            validation_freq=1,
-            callbacks=self.callbacks(),
+            validation_freq=5,
+            callbacks=self.callbacks(gan=gan),
         )
 
 

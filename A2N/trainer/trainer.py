@@ -1,4 +1,6 @@
 """custom model trainer"""
+from typing import Dict
+
 import tensorflow as tf
 import tensorflow.keras.models as KM
 
@@ -34,23 +36,28 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
     def compile(
         self,
         optimizer: tf.keras.optimizers,
-        loss: tf.keras.losses.Loss,
-        metric=tf.keras.metrics.Metric,
+        loss: Dict[str, tf.keras.losses.Loss],
+        loss_weights: Dict[str, float],
+        metric=Dict[str, tf.keras.metrics.Metric],
         perceptual: bool = False,
     ) -> None:
         # pylint: disable=attribute-defined-outside-init
         """compiles the model object with corresponding attributes
         Args:
             optimizer (tf.keras.optimizers): optimizer for model training
-            loss (Dict[tf.keras.losses.Loss]): loss definitions for the model outputs
-            loss (Dict[tf.keras.metrics.Metric]): performance metrics for model outputs
+            loss (Dict[str, tf.keras.losses.Loss]): loss definitions for the model outputs
+            loss_weights (Dict[str, float]): weights for each loss definition
+            metric (Dict[str, tf.keras.metrics.Metric]): performance metrics for model outputs
             perceptual (bool, optional): use precpetual loss on latent feature. Defaults to False
         """
         super().compile()
         self.optimizer = optimizer
         self.loss = loss
+        self.loss_weights = loss_weights
+
         if perceptual:
-            loss["percep"] = perceptual_layer()
+            self.loss["percep"] = perceptual_layer()
+            self.loss_weights["percep"] = 1e-4
             metric["percep"] = None
         assert len(self.loss) == len(
             metric
@@ -93,29 +100,33 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
             model_outputs = self.model(LR, training=True)
 
             losses = []
+            losses_grad = []
             # calculate losses
-            for _, key in enumerate(self.loss_keys):
+            for i, key in enumerate(self.loss_keys):
                 if key == "percep":
                     losses.append(self.loss[key]([HR, model_outputs], training=False))
                 else:
                     losses.append(self.loss[key](HR, model_outputs))
+                losses_grad.append(tf.reduce_mean(losses[i]) * self.loss_weights[key])
 
             if self.mode == "gan":
                 d_gen = self.discriminator(model_outputs)
 
                 # Disc score loss for generator update
                 g_loss = self.d_loss(d_gen, tf.ones_like(d_gen))
-                losses.append(g_loss)
+                losses_grad.append(1e-7 * tf.reduce_mean(g_loss))
 
         # calculate and apply gradients
         grads = tape.gradient(
-            losses,
+            losses_grad,
             self.model.trainable_weights,
         )
         self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
 
         # prepare the logs dictionary
-        logs = dict(zip(self.loss_keys, losses[:-1] if self.mode == "gan" else losses))
+        logs = dict(
+            zip(self.loss_keys, losses_grad[:-1] if self.mode == "gan" else losses)
+        )
         logs = {key: tf.reduce_mean(value) for key, value in logs.items()}
 
         # Add metrics if applicable
@@ -138,9 +149,9 @@ class Trainer(KM.Model):  # pylint: disable=too-many-ancestors
                 d_HR = self.discriminator(HR)
 
                 # Disc score loss on generated and gt images
-                d_loss = self.d_loss(d_gen, tf.zeros_like(d_gen)) + self.d_loss(
-                    d_HR, tf.ones_like(d_HR)
-                )
+                d_loss = 1e-7 * tf.reduce_mean(
+                    self.d_loss(d_gen, tf.zeros_like(d_gen))
+                ) + 1e-7 * tf.reduce_mean(self.d_loss(d_HR, tf.ones_like(d_HR)))
 
             # calculate and apply gradients
             grads = tape.gradient(
